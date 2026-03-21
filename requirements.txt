@@ -11,3 +11,4 @@ gym
 osmnx
 matplotlib
 networkx
+streamlit-folium
