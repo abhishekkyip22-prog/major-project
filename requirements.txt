@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+scikit-learn
+geopy
+folium
+requests
+ortools
+stable-baselines3
+gym
+osmnx
