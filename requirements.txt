@@ -9,3 +9,5 @@ ortools
 stable-baselines3
 gym
 osmnx
+matplotlib
+networkx
