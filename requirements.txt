@@ -12,3 +12,14 @@ osmnx
 matplotlib
 networkx
 streamlit-folium
+streamlit
+pandas
+numpy
+folium
+streamlit-folium
+requests
+matplotlib
+ortools
+pydeck
+altair
+scikit-learn
