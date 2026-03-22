@@ -206,8 +206,27 @@ with left:
     st_folium(folium_map, width=800)
 
 # ---------------- ETA ----------------
-traffic_factor = {"clear":1,"rainy":1.3,"foggy":1.2,"stormy":1.5,"hot":1.1,"cold":1.1}
-eta = total_distance * 3 * traffic_factor[weather]
+traffic_factor = {
+    "clear": 1,
+    "rainy": 1.3,
+    "foggy": 1.2,
+    "stormy": 1.5,
+    "hot": 1.1,
+    "cold": 1.1
+}
+
+# 🚗 Vehicle speed ranges (urban conditions)
+vehicle_speed_range = {
+    "Bike": (15, 25),
+    "Car": (11, 12),
+    "Truck": (12, 20)
+}
+
+# Choose speed (use average for stability)
+speed = sum(vehicle_speed_range[vehicle]) / 2
+
+# ⏱️ ETA calculation
+eta = (total_distance / speed) * 60 * traffic_factor[weather]
 
 # ---------------- DASHBOARD ----------------
 c1, c2, c3 = st.columns(3)
