@@ -11,6 +11,65 @@ from folium.plugins import HeatMap
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 import numpy as np
 import math
+import pydeck as pdk
+import base64
+
+
+
+# ---------------- 🎨 PREMIUM LIGHT UI ----------------
+st.markdown("""
+<style>
+
+/* 🌤 Background */
+html, body, [class*="css"] {
+    background: linear-gradient(180deg, #f8fafc, #eef2ff);
+    color: #111827;
+}
+
+/* 🧊 Glass cards */
+.card {
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    transition: 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+}
+
+/* 🔘 Buttons */
+.stButton button {
+    background: linear-gradient(90deg, #6366f1, #3b82f6);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    padding: 10px 18px;
+    font-weight: 600;
+}
+
+.stButton button:hover {
+    transform: scale(1.03);
+}
+
+/* 📊 Metric cleanup */
+[data-testid="stMetric"] {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+
+
 
 # ---------------- LOAD MODEL ----------------
 base_path = os.path.dirname(__file__)
@@ -151,67 +210,281 @@ traffic_factor = {"clear":1,"rainy":1.3,"foggy":1.2,"stormy":1.5,"hot":1.1,"cold
 eta = total_distance * 3 * traffic_factor[weather]
 
 # ---------------- DASHBOARD ----------------
-c1,c2,c3 = st.columns(3)
-c1.metric("Distance (km)", round(total_distance,2))
-c2.metric("ETA (min)", int(eta))
-c3.metric("Stops", len(delivery_points))
+c1, c2, c3 = st.columns(3)
 
+c1.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Distance</div>
+    <div style="font-size:26px; font-weight:600;">{round(total_distance,2)} km</div>
+</div>
+""", unsafe_allow_html=True)
+
+c2.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">ETA</div>
+    <div style="font-size:26px; font-weight:600;">{int(eta)} min</div>
+</div>
+""", unsafe_allow_html=True)
+
+c3.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Stops</div>
+    <div style="font-size:26px; font-weight:600;">{len(delivery_points)}</div>
+</div>
+""", unsafe_allow_html=True)
 # ---------------- TRACKING ----------------
-placeholder = st.empty()
+# ---------------- SMOOTH TRACKING FIX ----------------
+import pydeck as pdk
+
+map_placeholder = st.empty()   # ✅ IMPORTANT
 status = st.empty()
 progress = st.progress(0)
 
 if st.button("▶️ Start Live Tracking") and route_coords:
+
     route_coords = route_coords[::5]
+    path = [[coord[1], coord[0]] for coord in route_coords]
 
-    for i, coord in enumerate(route_coords):
-        p = i/len(route_coords)
-        progress.progress(min(p,1.0))
+    for i in range(len(path)):
+        current_path = path[:i+1]
+        current_point = path[i]
 
-        sim_map = folium.Map(location=coord, zoom_start=13)
-        folium.Marker(coord, icon=folium.Icon(color="red")).add_to(sim_map)
-
-        with placeholder:
-            st_folium(sim_map, width=800, key=f"track{i}")
-
+        # Progress
+        p = i / len(path)
+        progress.progress(min(p, 1.0))
         status.info(f"🚚 Progress {int(p*100)}%")
-        time.sleep(0.03)
+
+        # Route
+        path_layer = pdk.Layer(
+            "PathLayer",
+            data=[{"path": current_path}],
+            get_path="path",
+            width_scale=10,
+            width_min_pixels=3,
+            get_color=[0, 0, 255],
+        )
+
+        # Truck
+        truck_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=[{"position": current_point}],
+            get_position="position",
+            get_color=[0, 200, 0],
+            get_radius=80,
+        )
+
+        view_state = pdk.ViewState(
+            latitude=current_point[1],
+            longitude=current_point[0],
+            zoom=13,
+        )
+
+        deck = pdk.Deck(
+            layers=[path_layer, truck_layer],
+            initial_view_state=view_state,
+        )
+
+        # ✅ UPDATE SAME MAP (no stacking)
+        with map_placeholder:
+            st.pydeck_chart(deck)
+
+        time.sleep(0.05)
 
     progress.progress(1.0)
     status.success("Delivery Completed")
 
+
+
+
 # ---------------- PREDICTION ----------------
+# ---------------- PREDICTION ----------------
+from datetime import datetime
+
 if st.button("🚀 Predict"):
 
     if total_distance == 0:
         st.warning("Enter valid route")
     else:
+        # 🧠 Extra intelligent features (safe for old model)
+        now = datetime.now()
+        hour = now.hour
+
+        is_peak = 1 if (8 <= hour <= 11 or 17 <= hour <= 21) else 0
+        is_night = 1 if (hour >= 22 or hour <= 5) else 0
+
+        num_stops = len(delivery_points)
+
+        traffic_score = total_distance * (1.5 if is_peak else 1.0)
+
+        vehicle_map = {"Bike": 1.0, "Car": 0.8, "Truck": 0.6}
+        vehicle_efficiency = vehicle_map[vehicle]
+
+        weather_score_map = {
+            "clear": 0,
+            "hot": 0.2,
+            "cold": 0.3,
+            "foggy": 0.5,
+            "rainy": 0.7,
+            "stormy": 1.0
+        }
+        weather_score = weather_score_map[weather]
+
+        # ✅ Build dataframe (SAFE with your model)
         df = pd.DataFrame([{
             "latitude": pickup_lat,
             "longitude": pickup_lon,
             "distance_km": total_distance,
+            "num_stops": num_stops,
+            "hour": hour,
+            "is_peak": is_peak,
+            "is_night": is_night,
+            "traffic_score": traffic_score,
+            "vehicle_efficiency": vehicle_efficiency,
+            "weather_score": weather_score,
             f"weather_condition_{weather}": 1
         }]).reindex(columns=columns, fill_value=0)
 
         pred = model.predict(df)
         st.session_state.prediction = int(pred[0])
 
+        # ✅ Confidence (if model supports it)
+        try:
+            proba = model.predict_proba(df)[0][1]
+            st.session_state.confidence = proba
+        except:
+            st.session_state.confidence = None
+
+
+# ---------------- RESULT DISPLAY ----------------
 if st.session_state.prediction is not None:
+
     if st.session_state.prediction == 1:
-        st.success("🟢 On Time")
+        if st.session_state.get("confidence") is not None:
+            st.success(f"🟢 On Time ({round(st.session_state.confidence*100)}% confidence)")
+        else:
+            st.success("🟢 On Time")
+
     else:
-        st.error("🔴 Delayed")
-
+        if st.session_state.get("confidence") is not None:
+            st.error(f"🔴 Delayed ({round((1-st.session_state.confidence)*100)}% confidence)")
+        else:
+            st.error("🔴 Delayed")
 # ---------------- INSIGHTS ----------------
-st.subheader("📈 Insights")
+# ---------------- 📈 INTERACTIVE INSIGHTS (NO PIP - ALTAIR) ----------------
+import altair as alt
 
-st.line_chart(np.random.randint(60,95,7))
+st.subheader("📈 Delivery Insights Dashboard")
 
-fig, ax = plt.subplots()
-ax.bar(["Traffic","Weather","Distance"], [40,30,30])
-st.pyplot(fig)
+# 🎯 Calculations
+avg_speed = round(total_distance / (eta/60 + 0.01), 2)
+delay_risk = min(int((eta / (total_distance + 0.1)) * 10), 100)
 
-# ---------------- SUGGESTIONS ----------------
+weather_impact = {
+    "clear": 10, "hot": 20, "cold": 25,
+    "foggy": 40, "rainy": 60, "stormy": 80
+}
+vehicle_efficiency_map = {"Bike": 90, "Car": 75, "Truck": 60}
+
+weather_score = weather_impact[weather]
+vehicle_score = vehicle_efficiency_map[vehicle]
+
+# ---------------- 🎨 KPI CARDS ----------------
+c1, c2, c3, c4 = st.columns(4)
+
+c1.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Avg Speed</div>
+    <div style="font-size:26px; font-weight:600;">{avg_speed} km/h</div>
+</div>
+""", unsafe_allow_html=True)
+
+c2.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Delay Risk</div>
+    <div style="font-size:26px; font-weight:600;">{delay_risk}%</div>
+</div>
+""", unsafe_allow_html=True)
+
+c3.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Weather Impact</div>
+    <div style="font-size:26px; font-weight:600;">{weather_score}%</div>
+</div>
+""", unsafe_allow_html=True)
+
+c4.markdown(f"""
+<div class="card">
+    <div style="font-size:13px; color:#6b7280;">Vehicle Efficiency</div>
+    <div style="font-size:26px; font-weight:600;">{vehicle_score}%</div>
+</div>
+""", unsafe_allow_html=True)
+# ---------------- 📊 INTERACTIVE LINE CHART ----------------
+st.markdown("### 📉 Delivery Performance Trend")
+
+x = list(range(1, 21))
+y = []
+
+for i in x:
+    value = int((i * 5) - (weather_score * 0.3) - (len(delivery_points) * 2))
+    value = max(10, min(value, 100))
+    y.append(value)
+
+df_line = pd.DataFrame({
+    "Step": x,
+    "Performance": y
+})
+
+line_chart = alt.Chart(df_line).mark_line(point=True).encode(
+    x=alt.X("Step", title="Progress Step"),
+    y=alt.Y("Performance", title="Performance %"),
+    tooltip=["Step", "Performance"]
+).interactive()  # 🔥 enables zoom + pan
+
+st.altair_chart(line_chart, use_container_width=True)
+
+# ---------------- 📊 INTERACTIVE BAR ----------------
+st.markdown("### 📊 Delay Factors Breakdown")
+
+factors = ["Traffic", "Weather", "Distance", "Stops"]
+values = [
+    int(delay_risk * 0.4),
+    weather_score,
+    int(total_distance * 5),
+    len(delivery_points) * 10
+]
+
+df_bar = pd.DataFrame({
+    "Factor": factors,
+    "Impact": values
+})
+
+bar_chart = alt.Chart(df_bar).mark_bar().encode(
+    x=alt.X("Factor", sort=None),
+    y=alt.Y("Impact"),
+    tooltip=["Factor", "Impact"],
+    color="Factor"
+).interactive()
+
+st.altair_chart(bar_chart, use_container_width=True)
+
+# ---------------- 🧠 AI INSIGHTS ----------------
+st.markdown("### 🧠 AI Insights")
+
+if delay_risk > 70:
+    st.error("⚠️ High risk of delay due to traffic and route complexity")
+elif delay_risk > 40:
+    st.warning("⚠️ Moderate delay expected — consider optimizing route")
+else:
+    st.success("✅ Delivery likely to be on time")
+
+if weather in ["rainy", "stormy"]:
+    st.info("🌧 Weather significantly impacting delivery")
+
+if vehicle == "Truck" and total_distance < 5:
+    st.info("🚛 Truck is not optimal for short routes")
+
+if len(delivery_points) > 3:
+    st.info("📦 Multiple stops increasing delivery time")# ---------------- SUGGESTIONS ----------------
 st.subheader("🤖 Suggestions")
 
 if weather in ["rainy","stormy"]:
