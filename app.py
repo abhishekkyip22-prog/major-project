@@ -16,7 +16,7 @@ import base64
 
 
 
-# ---------------- 🎨 PREMIUM LIGHT UI ----------------
+# ----------------  PREMIUM LIGHT UI ----------------
 st.markdown("""
 <style>
 
@@ -82,7 +82,7 @@ if "prediction" not in st.session_state:
 
 # ---------------- PAGE ----------------
 st.set_page_config(page_title="Smart Delivery System", layout="wide")
-st.title("🚚 Smart Delivery Routing System")
+st.title("🚚 Delivery Routing System")
 
 left, right = st.columns([3, 1])
 
@@ -90,8 +90,8 @@ left, right = st.columns([3, 1])
 with right:
     st.subheader("📦 Setup")
 
-    pickup_lat = st.number_input("Pickup Latitude", value=28.6)
-    pickup_lon = st.number_input("Pickup Longitude", value=77.2)
+    pickup_lat = st.number_input("Warehouse Latitude", value=28.6)
+    pickup_lon = st.number_input("Warehouse Longitude", value=77.2)
 
     num_stops = st.number_input("Stops", 1, 5, 2)
 
@@ -236,7 +236,7 @@ c3.markdown(f"""
 # ---------------- SMOOTH TRACKING FIX ----------------
 import pydeck as pdk
 
-map_placeholder = st.empty()   # ✅ IMPORTANT
+map_placeholder = st.empty()   
 status = st.empty()
 progress = st.progress(0)
 
@@ -373,7 +373,7 @@ if st.session_state.prediction is not None:
 # ---------------- 📈 INTERACTIVE INSIGHTS (NO PIP - ALTAIR) ----------------
 import altair as alt
 
-st.subheader("📈 Delivery Insights Dashboard")
+st.subheader("📈 Delivery Insights ")
 
 # 🎯 Calculations
 avg_speed = round(total_distance / (eta/60 + 0.01), 2)
@@ -468,7 +468,7 @@ bar_chart = alt.Chart(df_bar).mark_bar().encode(
 st.altair_chart(bar_chart, use_container_width=True)
 
 # ---------------- 🧠 AI INSIGHTS ----------------
-st.markdown("### 🧠 AI Insights")
+st.markdown("### 🧠  Insights")
 
 if delay_risk > 70:
     st.error("⚠️ High risk of delay due to traffic and route complexity")
